@@ -7,4 +7,4 @@ data Result t = Ok t | Err String
 -}
 
 notFound = "Not found"
-unboundVariable = "unboundVariable"
+unboundVariable = "Unbound variable"

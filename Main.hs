@@ -18,12 +18,22 @@ inferType stack callIndex (Variable x) =
             Err notFound -> Err unboundVariable
 
 -- (MN)
-inferType stack callIndex (Apply m n)     = Err ""
-
+inferType stack callIndex (Apply m n) =
+    case inferType stack callIndex m of
+        Ok (tM, newCallIndexM) ->
+            case inferType stack newCallIndexM n of
+                Ok (tN, newCallIndexN) ->
+                    let (newReturnType, newCallIndex) = getAvailableVariableTypeName newCallIndexN
+                        generatedSubstitutions = generateSubstitutions tM (TypeFunction tN newReturnType)
+                            in case generatedSubstitutions of
+                                Ok tableWithSubstitutions -> Ok (substitudeTypeWithNewOne tableWithSubstitutions newReturnType, newCallIndex)
+                                Err msg -> Err msg
+                Err msg -> Err msg
+        Err msg -> Err msg
 
 -- (λ{args}.M)
 inferType stack callIndex (Lambda args m) =
-    let (arguments, Ok (targ, callIndexResult)) =
+    let (arguments, result) =
             let (new_table, newCallIndex) = foldl
                     (\(table, currCI) arg ->
                         let (ty, newCI) = getAvailableVariableTypeName currCI
@@ -32,12 +42,14 @@ inferType stack callIndex (Lambda args m) =
                     ([], callIndex)
                     args
                 in (new_table, inferType (addNewTable stack new_table) newCallIndex m)
-        in Ok (foldr (TypeFunction . snd) targ arguments, callIndexResult)
+        in case result of
+            Ok (targ, callIndexResult) -> Ok (foldr (TypeFunction . snd) targ arguments, callIndexResult)
+            Err msg -> Err msg
 
 main :: IO ()
 main = do
-    let expr = "\\xy.\\x.y"
-    let term = Lambda ["x", "y"] (Lambda ["x"] (Variable "x"))
+    let expr = "\\xy.xy"
+    let term = Lambda ["x","y"] (Apply (Variable "x") (Variable "y"))
     case inferType [] 0 term of
         Ok (tt, _) -> putStrLn $ expr ++ " : " ++ show tt
         Err err    -> putStrLn $ "Error: " ++ err
