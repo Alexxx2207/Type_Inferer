@@ -3,7 +3,6 @@ module Environment where
 import           TermType (TermType (..))
 import           Utils
 
--- (име, променлива|функция , типа е окончателен , връщан тип , приемащ тип))
 type Record = (String, TermType)
 type TypeTable = [Record]
 type Stack = [TypeTable]

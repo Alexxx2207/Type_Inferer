@@ -1,9 +1,11 @@
 module Main where
 
+import           Control.Monad.State
 import           Environment
 import           LambdaTerm
 import           TermType
 import           Utils
+
 
 
 inferType :: Stack -> Integer -> LambdaTerm -> Result (TermType, Integer)
