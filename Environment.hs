@@ -5,7 +5,15 @@ import           Utils
 
 type Record = (String, TermType)
 type TypeTable = [Record]
+type Substitutions = [(TermType,TermType)]
 type Stack = [TypeTable]
+
+
+instance Show (Result (TermType, Integer, Stack)) where
+  show (Ok (x, y, z)) = show z
+  show (Err msg)      = show msg
+
+
 
 names = ["t" ++ show x | x <- [0..]]
 
@@ -25,42 +33,45 @@ searchStack x (typeTable : rest) =
         Ok record    -> Ok record
         Err notFound -> searchStack x rest
 
-addNewTable :: [[Record]] -> [Record] -> [[Record]]
-addNewTable stack table = table : stack
+searchSubstitutions :: TermType -> Substitutions -> Result TermType
+searchSubstitutions x [] = Err notFound
+searchSubstitutions x (el@(tSearched, subs) : rest)
+  | tSearched == x = Ok subs
+  | otherwise = searchSubstitutions x rest
 
--- проверява дали не се съдържа пъривя аргумент(име на тип) във втория аргумент - идеята ми е, че може да се появят циклични оценки на типове
+-- проверява дали не се съдържа първия аргумент(име на тип) във втория аргумент
+-- идеята ми е, че може да се появят циклични оценки на типове
 contains :: String -> TermType -> Bool
 contains x (TypeVariable name)        = x == name
 contains x (TypeFunction arg retType) = contains x arg || contains x retType
 
 -- приема стария и новия тип и връща множеството от полагания
-generateSubstitutions :: TermType -> TermType -> Result TypeTable
-generateSubstitutions old new@(TypeVariable x)
-    | old == new = Ok []
-    | contains x old = Err ("Cyclic type definition " ++ x ++ " in the " ++ show old)
-    | otherwise = Ok [(x, old)]
+generateSubstitutions :: TermType -> TermType -> Result Substitutions
 generateSubstitutions old@(TypeVariable x) new
-    | old == new = Ok []
     | contains x new = Err ("Cyclic type definition " ++ x ++ " in the " ++ show new)
-    | otherwise = Ok [(x, new)]
+    | otherwise = Ok [(old, new)]
 generateSubstitutions (TypeFunction arg1 res1) (TypeFunction arg2 res2) =
     let argumentsSumbstitutions = generateSubstitutions arg1 arg2
         returnTypeSumbstitutions = generateSubstitutions res1 res2
         in case (argumentsSumbstitutions, returnTypeSumbstitutions) of
             (Ok tableForArguments, Ok tableForReturnType) -> Ok (tableForArguments ++ tableForReturnType)
+            (Err msg1, Ok _) -> Err msg1
+            (Ok _, Err msg2) -> Err msg2
             (Err msg1, Err msg2) -> Err (msg1 ++ " " ++ msg2)
 
 
 -- приема полагания и стария тип и връща новия тип
-substitudeTypeWithNewOne :: TypeTable -> TermType -> TermType
-substitudeTypeWithNewOne changes (TypeVariable x) =
-    case searchTable x changes of
-        Ok (_,t) -> t
-        Err msg  -> TypeVariable x
-substitudeTypeWithNewOne changes (TypeFunction arguemntType returnType) =
-    TypeFunction (substitudeTypeWithNewOne changes arguemntType) (substitudeTypeWithNewOne changes returnType)
+substitudeTypeWithNewOne :: Substitutions -> TermType -> TermType
+substitudeTypeWithNewOne changes old =
+    case searchSubstitutions old changes of
+        Ok t  -> t
+        Err _ -> old
 
 
 -- <стара таблица, полаганията> -> нова таблица
-updateTypeTable :: TypeTable -> TypeTable -> TypeTable
+updateTypeTable :: TypeTable -> Substitutions -> TypeTable
 updateTypeTable oldTable changes = [(name, substitudeTypeWithNewOne changes ty) | (name, ty) <- oldTable]
+
+-- <стар стек, полаганията> -> нова таблица
+updateStack :: Stack -> Substitutions -> Stack
+updateStack stack changes = map (`updateTypeTable` changes) stack
