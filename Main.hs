@@ -21,15 +21,16 @@ inferType stack callIndex (Variable x) =
 
 -- (<M><N>)
 inferType stack callIndex (Apply m n) =
-    case inferType stack callIndex m of
-        Ok (tM, newCallIndexM, _) ->
-            case inferType stack newCallIndexM n of
-                Ok (tN, newCallIndexN, _) ->
-                    let (newReturnType, newCallIndex) = getAvailableVariableTypeName newCallIndexN
+    case inferType stack callIndex n of
+        Ok (tN, newCallIndexN, modified_stackN) ->
+            case inferType modified_stackN newCallIndexN m of
+                Ok (tM, newCallIndexM, modified_stackM) ->
+                    let (newReturnType, newCallIndex) = getAvailableVariableTypeName newCallIndexM
                         generatedSubstitutions = generateSubstitutions tM (TypeFunction tN newReturnType)
                             in case generatedSubstitutions of
-                                Ok tableWithSubstitutions -> let newType = substitudeTypeWithNewOne tableWithSubstitutions newReturnType
-                                    in Ok (newType, newCallIndex, updateStack stack tableWithSubstitutions)
+                                Ok tableWithSubstitutions ->
+                                    let newType = substitudeTypeWithNewOne tableWithSubstitutions newReturnType
+                                        in Ok (newType, newCallIndex, updateStack modified_stackM tableWithSubstitutions)
                                 Err msg -> Err msg
                 Err msg -> Err msg
         Err msg -> Err msg
@@ -52,13 +53,9 @@ inferType stack callIndex (Lambda args m) =
             Ok (targ, callIndexResult, modified_stack) -> Ok (foldr (TypeFunction . snd) targ (head modified_stack), callIndexResult, tail modified_stack)
             Err msg -> Err msg
 
--- >>> inferType [] 0 (  Lambda ["x","y"] (Lambda ["a"] (Variable "a")) )
--- [[("a",t2)],[("x",t0),("y",t1)]]
-
 main :: IO ()
 main = do
-    let expr = "\\xy.xy"
-    let term =  Variable "y"
+    let term =   Lambda ["x","y"] ( Lambda ["a","b"] ( Apply (Variable "x") (Apply (Variable "a") (Variable "y")) ) )
     case inferType [] 0 term of
-        Ok (tt, _, _) -> putStrLn $ expr ++ " : " ++ show tt
+        Ok (tt, _, _) -> print tt
         Err err       -> putStrLn $ "Error: " ++ err
