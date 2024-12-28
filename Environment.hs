@@ -1,72 +1,44 @@
 module Environment where
 
-import           TermType (TermType (..))
+import           Control.Monad.Except
+import           Data.Map             as TypeTable
+import           Data.Maybe           (fromMaybe)
+import           TermType             (TermType (..))
 import           Utils
 
-type Record = (String, TermType)
-type TypeTable = [Record]
-type Substitutions = [(TermType,TermType)]
-type Stack = [TypeTable]
+
+type Stack = TypeTable.Map String TermType
+type Substitutions = TypeTable.Map String TermType
+
+-- <полагания, стар тип> -> нов тип
+applySubstitutionSpecificType :: Substitutions -> TermType -> TermType
+applySubstitutionSpecificType substitutions old@(TypeVariable x)      = fromMaybe old (TypeTable.lookup x substitutions)
+applySubstitutionSpecificType substitutions (TypeFunction arg1 res1)  = TypeFunction (applySubstitutionSpecificType substitutions arg1) (applySubstitutionSpecificType substitutions res1)
+
+-- <полагания, стар стек> -> нов стек
+applySubstritutionEntireStack :: Substitutions -> Stack -> Stack
+applySubstritutionEntireStack substitutions = TypeTable.map (applySubstitutionSpecificType substitutions)
+
+chainSubstitutions :: Substitutions -> Substitutions -> Substitutions
+chainSubstitutions oldSubs newSubs = TypeTable.union (TypeTable.map (applySubstitutionSpecificType oldSubs) newSubs) oldSubs
 
 
-names = ["t" ++ show x | x <- [0..]]
+generateSubstitutions :: TermType -> TermType -> Except String Substitutions
+generateSubstitutions old@(TypeVariable typeName) typeToUnifyTo
+    | typeToUnifyTo == old = return TypeTable.empty
+    | contains typeName typeToUnifyTo = throwError $ cyclicDefinition typeName typeToUnifyTo
+    | otherwise = return (TypeTable.singleton typeName typeToUnifyTo)
 
-getAvailableVariableTypeName :: Integer -> (TermType, Integer)
-getAvailableVariableTypeName callIndex = (TypeVariable ("t" ++ show callIndex), succ callIndex)
+generateSubstitutions typeToUnifyTo old@(TypeVariable typeName)
+    | typeToUnifyTo == old = return TypeTable.empty
+    | contains typeName typeToUnifyTo = throwError $ cyclicDefinition typeName typeToUnifyTo
+    | otherwise = return (TypeTable.singleton typeName typeToUnifyTo)
 
-searchTable :: String -> TypeTable -> Result Record
-searchTable x [] = Err notFound
-searchTable x (el@(name, _) : rest)
-  | name == x = Ok el
-  | otherwise = searchTable x rest
+generateSubstitutions (TypeFunction arg1 res1) (TypeFunction arg2 res2) = do
+    s1 <- generateSubstitutions arg1 arg2
+    s2 <- generateSubstitutions (applySubstitutionSpecificType s1 res1) (applySubstitutionSpecificType s1 res2)
+    return $ chainSubstitutions s2 s1
 
-searchStack :: String -> Stack -> Result Record
-searchStack x [] = Err notFound
-searchStack x (typeTable : rest) =
-    case searchTable x typeTable of
-        Ok record    -> Ok record
-        Err notFound -> searchStack x rest
-
-searchSubstitutions :: TermType -> Substitutions -> Result TermType
-searchSubstitutions x [] = Err notFound
-searchSubstitutions x (el@(tSearched, subs) : rest)
-  | tSearched == x = Ok subs
-  | otherwise = searchSubstitutions x rest
-
--- проверява дали не се съдържа първия аргумент(име на тип) във втория аргумент
--- идеята ми е, че може да се появят циклични оценки на типове
 contains :: String -> TermType -> Bool
-contains x (TypeVariable name)        = x == name
-contains x (TypeFunction arg retType) = contains x arg || contains x retType
-
--- приема стария и новия тип и връща множеството от полагания
-generateSubstitutions :: TermType -> TermType -> Result Substitutions
-generateSubstitutions old@(TypeVariable x) new
-    | contains x new = Err ("Cyclic type definition " ++ x ++ " in the " ++ show new)
-    | otherwise = Ok [(old, new)]
-generateSubstitutions (TypeFunction arg1 res1) (TypeFunction arg2 res2) =
-    let argumentsSumbstitutions = generateSubstitutions arg1 arg2
-        returnTypeSumbstitutions = generateSubstitutions res1 res2
-        in case (argumentsSumbstitutions, returnTypeSumbstitutions) of
-            (Ok tableForArguments, Ok tableForReturnType) -> Ok (tableForArguments ++ tableForReturnType)
-            (Err msg1, Ok _) -> Err msg1
-            (Ok _, Err msg2) -> Err msg2
-            (Err msg1, Err msg2) -> Err (msg1 ++ " " ++ msg2)
-
-
--- приема полагания и стария тип и връща новия тип
-substitudeTypeWithNewOne :: Substitutions -> TermType -> TermType
-substitudeTypeWithNewOne changes old@(TypeVariable _) =
-    case searchSubstitutions old changes of
-        Ok t  -> t
-        Err _ -> old
-substitudeTypeWithNewOne changes old@(TypeFunction arg res) =
-  TypeFunction (substitudeTypeWithNewOne changes arg) (substitudeTypeWithNewOne changes res)
-
--- <стара таблица, полаганията> -> нова таблица
-updateTypeTable :: TypeTable -> Substitutions -> TypeTable
-updateTypeTable oldTable changes = [(name, substitudeTypeWithNewOne changes ty) | (name, ty) <- oldTable]
-
--- <стар стек, полаганията> -> нова таблица
-updateStack :: Stack -> Substitutions -> Stack
-updateStack stack changes = map (`updateTypeTable` changes) stack
+contains typeName (TypeVariable x)         = x == typeName
+contains typeName (TypeFunction arg1 res1) = contains typeName arg1 || contains typeName res1

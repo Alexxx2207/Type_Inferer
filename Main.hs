@@ -1,61 +1,34 @@
 module Main where
 
-import           Control.Monad.State
-import           Environment
+import           Distribution.Simple.Test.ExeV10 (runTest)
+import           Inference
 import           LambdaTerm
-import           TermType
 import           Utils
 
+testCases :: [(Int, LambdaTerm)]
+testCases = [
+        (1, Variable "x"),
+        (2, Apply (Variable "x") (Variable "y")),
+        (3, Lambda ["x"] (Variable "x")),
+        (4, Lambda ["x", "y"] (Variable "x")),
+        (5, Lambda ["x", "y"] (Variable "y")),
+        (6, Lambda ["x"] (Apply (Variable "x") (Variable "x"))),
+        (7, Lambda ["f","x"] (Apply (Variable "f") (Apply (Variable "f") (Variable "x")))),
+        (8, Lambda ["x"] (Lambda ["y"] (Apply (Variable "x") (Variable "y")))),
+        (9, Lambda ["f","g","x"] (Apply (Variable "f") (Apply (Variable "g") (Variable "x")))),
+        (10, Lambda ["a","b"] (Lambda ["x","y"] (Variable "b"))),
+        (11, Lambda ["x", "y"] (Lambda ["x"] (Variable "x"))),
+        (12, Lambda ["x", "y", "z"] ( Apply (Lambda ["b"] (Apply (Variable "x") (Variable "y"))) (Lambda [] (Apply (Variable "x") (Variable "z"))) )),
+        (13, Lambda ["f","x","y"] (Apply (Apply (Variable "f") (Variable "x")) (Variable "y"))),
+        (14, Apply (Lambda ["x"] (Variable "x")) (Lambda ["y"] (Variable "y")))
+    ]
 
-
-inferType :: Stack -> Integer -> LambdaTerm -> Result (TermType, Integer, Stack)
-
--- просто (<М>) променлива
-inferType stack callIndex (Variable x) =
-    if callIndex == 0
-        then let (type_name, _) = getAvailableVariableTypeName 0
-            in Ok (type_name, 1, stack)
-        else case searchStack x stack of
-            Ok (_, tt)   -> Ok (tt, callIndex, stack)
-            Err notFound -> Err unboundVariable
-
--- (<M><N>)
-inferType stack callIndex (Apply m n) =
-    case inferType stack callIndex n of
-        Ok (tN, newCallIndexN, modified_stackN) ->
-            case inferType modified_stackN newCallIndexN m of
-                Ok (tM, newCallIndexM, modified_stackM) ->
-                    let (newReturnType, newCallIndex) = getAvailableVariableTypeName newCallIndexM
-                        generatedSubstitutions = generateSubstitutions tM (TypeFunction tN newReturnType)
-                            in case generatedSubstitutions of
-                                Ok tableWithSubstitutions ->
-                                    let newType = substitudeTypeWithNewOne tableWithSubstitutions newReturnType
-                                        in Ok (newType, newCallIndex, updateStack modified_stackM tableWithSubstitutions)
-                                Err msg -> Err msg
-                Err msg -> Err msg
-        Err msg -> Err msg
-
-
-
-
--- (λ{<arg> {,<arg>}}.<M>)
-inferType stack callIndex (Lambda args m) =
-    let (arguments, result) =
-            let (new_table, newCallIndex) = foldl
-                    (\(table, currCI) arg ->
-                        let (ty, newCI) = getAvailableVariableTypeName currCI
-                        in (table ++ [(arg, ty)], newCI)
-                    )
-                    ([], callIndex)
-                    args
-                in (new_table, inferType (new_table : stack) newCallIndex m)
-        in case result of
-            Ok (targ, callIndexResult, modified_stack) -> Ok (foldr (TypeFunction . snd) targ (head modified_stack), callIndexResult, tail modified_stack)
-            Err msg -> Err msg
+runTests :: [(Int, LambdaTerm)] -> Int -> Int -> IO ()
+runTests [] _ _ = print "End"
+runTests ((num, expression):rest) mx spaces = do
+    print $ show num ++ ")" ++ replicate spaces ' ' ++ showEither (inferTypeFacade expression)
+    runTests rest mx (mx - countDigits (succ num))
 
 main :: IO ()
-main = do
-    let term =   Lambda ["x","y"] ( Lambda ["a","b"] ( Apply (Variable "x") (Apply (Variable "a") (Variable "y")) ) )
-    case inferType [] 0 term of
-        Ok (tt, _, _) -> print tt
-        Err err       -> putStrLn $ "Error: " ++ err
+main = runTests testCases mx (mx-1)
+    where mx = succ $ countDigits $ length testCases
