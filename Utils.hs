@@ -2,9 +2,11 @@ module Utils where
 
 import           TermType
 
-showEither :: Either TermType String -> String
-showEither (Left t)    = "Type: " ++ show t
-showEither (Right err) = "Error: " ++ err
+data Result t = Ok t | Err String
+
+instance Show (Result TermType) where
+    show (Ok t)    = "Type: " ++ show t
+    show (Err msg) = "Error: " ++ msg
 
 
 cyclicDefinition :: String -> TermType -> String

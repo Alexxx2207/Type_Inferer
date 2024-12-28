@@ -26,7 +26,7 @@ testCases = [
 runTests :: [(Int, LambdaTerm)] -> Int -> Int -> IO ()
 runTests [] _ _ = print "End"
 runTests ((num, expression):rest) mx spaces = do
-    print $ show num ++ ")" ++ replicate spaces ' ' ++ showEither (inferTypeFacade expression)
+    print $ show num ++ ")" ++ replicate spaces ' ' ++ show (inferTFacade expression)
     runTests rest mx (mx - countDigits (succ num))
 
 main :: IO ()

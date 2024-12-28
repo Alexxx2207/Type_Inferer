@@ -1,46 +1,49 @@
 module Inference where
 
-import           Control.Monad.Except
-import           Control.Monad.State
-import           Control.Monad.Trans.Except
-import           Data.Map                   as TypeTable
+import           Data.Map    as TypeTable
 import           Environment
 import           LambdaTerm
 import           TermType
 import           Utils
 
-type StateWithSideEffect ttype = StateT Int (Except String) ttype
+-- генерира тип променлива от нов(произволен) тип
+getName :: Integer -> TermType
+getName i = TypeVariable ("a" ++ show i)
 
-generateNewVariable :: StateWithSideEffect TermType
-generateNewVariable = do
-    i <- get
-    put $ succ i
-    return (TypeVariable ("a" ++ show i))
+inferT :: Stack -> LambdaTerm -> Integer -> Result (TermType, Substitutions, Integer)
 
-inferType :: Stack -> LambdaTerm -> StateWithSideEffect (TermType, Substitutions)
-inferType stack (Variable x) =
-    case TypeTable.lookup x stack of
-        Just t  -> return (t, TypeTable.empty)
-        Nothing -> throwError $ unboundVariable ++ x
+-- оценява типа на израз, ако е променлива
+inferT st (Variable x) i =
+    case TypeTable.lookup x st of
+        Just t  -> Ok (t, TypeTable.empty, i)
+        Nothing -> Err (unboundVariable ++ x)
 
-inferType stack (Apply m n) = do
-    (tM, sM) <- inferType stack m
+-- оценява типа на израз, ако е апликация
+inferT st (Apply m n) i =
+    case inferT st m  i of
+        Ok (tM, subsM, iM) ->
+            case inferT (appSubstToStack subsM st) n iM of
+                Ok (tN, subsN, iN) ->
+                    let resTName = getName iN
+                    in case genSubst (appSubstToType subsN tM) (TypeFunction tN resTName) of
+                        Ok substitutionsApply ->
+                            Ok (appSubstToType substitutionsApply resTName, chainSubst substitutionsApply $ chainSubst subsN subsM, succ iN)
+                        Err msg -> Err msg
+                Err msg -> Err msg
+        Err msg -> Err msg
 
-    (tN, sN) <- inferType (applySubstritutionEntireStack sM stack) n
+-- оценява типа на израз, ако е абстракция
+inferT st (Lambda [] body) i = inferT st body i
+inferT st (Lambda (arg:rest) body) i =
+    let aType = getName i
+    in case inferT (TypeTable.insert arg aType st) (Lambda rest body) (succ i) of
+        Ok (t, subst, iNew) -> Ok (TypeFunction (appSubstToType subst aType) t, subst, iNew)
+        Err msg -> Err msg
 
-    newVarTypeName <- generateNewVariable
-    substitutionsApply <- lift $ generateSubstitutions (applySubstitutionSpecificType sN tM) (TypeFunction tN newVarTypeName)
-    return (applySubstitutionSpecificType substitutionsApply newVarTypeName, chainSubstitutions substitutionsApply $ chainSubstitutions sN sM)
-
-inferType stack (Lambda [] body) = inferType stack body
-inferType stack (Lambda (arg:rest) body) = do
-    argType <- generateNewVariable
-    (tBody, substitutionsFromBody) <- inferType (TypeTable.insert arg argType stack) (Lambda rest body)
-    return (TypeFunction (applySubstitutionSpecificType substitutionsFromBody argType) tBody, substitutionsFromBody)
-
-
-inferTypeFacade :: LambdaTerm -> Either TermType String
-inferTypeFacade e =
-    case runExcept $ runStateT (inferType TypeTable.empty e) 0  of
-        Right ((ttype, substitutions), _) -> Left (applySubstitutionSpecificType substitutions ttype)
-        Left err -> Right err
+-- фасадна функция за оценяване на тип на израз(за да не пишем в тестовете boilerplate code)
+inferTFacade :: LambdaTerm -> Result TermType
+inferTFacade term =
+    let result = inferT TypeTable.empty term 0
+    in case result of
+        Ok (t, s, _) -> Ok (appSubstToType s t)
+        Err err      -> Err err
