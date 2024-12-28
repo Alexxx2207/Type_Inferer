@@ -1,4 +1,4 @@
-module Environment where
+module Substitutions where
 
 import           Data.Map   as TypeTable
 import           Data.Maybe (fromMaybe)
@@ -6,32 +6,32 @@ import           TermType   (TermType (..))
 import           Utils
 
 
-type Stack = TypeTable.Map String TermType
-type Substitutions = TypeTable.Map String TermType
+type Table = TypeTable.Map String TermType
+type SubstitutionsTable = TypeTable.Map String TermType
 
 -- <полагания, стар тип> -> нов тип
 -- прилага полаганията, но само за един конкретен тип
 -- полезно е, когато свършва оценяването на връх от дървото
-appSubstToType :: Substitutions -> TermType -> TermType
+appSubstToType :: SubstitutionsTable -> TermType -> TermType
 appSubstToType substitutions old@(TypeVariable x)      = fromMaybe old (TypeTable.lookup x substitutions)
 appSubstToType substitutions (TypeFunction arg1 res1)  = TypeFunction (appSubstToType substitutions arg1) (appSubstToType substitutions res1)
 
--- <полагания, стар стек> -> нов стек
--- прилага полаганията върху целия стек
--- полезно е, когато при апликация искаме да променит тип - резултат от предичшно оценяване преди да оценим нов израз
-appSubstToStack :: Substitutions -> Stack -> Stack
-appSubstToStack substitutions = TypeTable.map (appSubstToType substitutions)
+-- <полагания, стар таблица> -> нов таблица
+-- прилага полаганията върху цялата таблица
+-- полезно е, когато при апликация искаме да променит тип - резултат от предишно оценяване преди да оценим нов израз
+appSubstToTable :: SubstitutionsTable -> Table -> Table
+appSubstToTable substitutions = TypeTable.map (appSubstToType substitutions)
 
--- <полагания, стар стек> -> нов стек
+-- <полагания, стар таблица> -> нов таблица
 -- прилага полаганията върху полагания
--- целта е да избегнем частни случаи, при които се разчита на потредбата на полаганията в таблицата при обхождане
+-- целта е да избегнем частни случаи, при които се разчита на подредбата на полаганията в таблицата при обхождане
 -- пример: полагане на полагането не може да бъде извършено преди първото полагане. Искаме гаранция, че ще се случат в правилен ред
-chainSubst :: Substitutions -> Substitutions -> Substitutions
+chainSubst :: SubstitutionsTable -> SubstitutionsTable -> SubstitutionsTable
 chainSubst oldSubs newSubs = TypeTable.union (TypeTable.map (appSubstToType oldSubs) newSubs) oldSubs
 
 
 -- генерира полагания така че да си паснат типовете
-genSubst :: TermType -> TermType -> Result Substitutions
+genSubst :: TermType -> TermType -> Result SubstitutionsTable
 genSubst old@(TypeVariable tName) target
     | target == old = Ok TypeTable.empty
     | contains tName target = Err $ cyclicDefinition tName target

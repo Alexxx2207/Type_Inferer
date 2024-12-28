@@ -1,8 +1,8 @@
 module Inference where
 
-import           Data.Map    as TypeTable
-import           Environment
+import           Data.Map      as TypeTable
 import           LambdaTerm
+import           Substitutions
 import           TermType
 import           Utils
 
@@ -10,19 +10,19 @@ import           Utils
 getName :: Integer -> TermType
 getName i = TypeVariable ("a" ++ show i)
 
-inferT :: Stack -> LambdaTerm -> Integer -> Result (TermType, Substitutions, Integer)
+inferT :: Table -> LambdaTerm -> Integer -> Result (TermType, SubstitutionsTable, Integer)
 
 -- оценява типа на израз, ако е променлива
-inferT st (Variable x) i =
-    case TypeTable.lookup x st of
+inferT table (Variable x) i =
+    case TypeTable.lookup x table of
         Just t  -> Ok (t, TypeTable.empty, i)
         Nothing -> Err (unboundVariable ++ x)
 
 -- оценява типа на израз, ако е апликация
-inferT st (Apply m n) i =
-    case inferT st m  i of
+inferT table (Apply m n) i =
+    case inferT table m  i of
         Ok (tM, subsM, iM) ->
-            case inferT (appSubstToStack subsM st) n iM of
+            case inferT (appSubstToTable subsM table) n iM of
                 Ok (tN, subsN, iN) ->
                     let resTName = getName iN
                     in case genSubst (appSubstToType subsN tM) (TypeFunction tN resTName) of
@@ -33,10 +33,10 @@ inferT st (Apply m n) i =
         Err msg -> Err msg
 
 -- оценява типа на израз, ако е абстракция
-inferT st (Lambda [] body) i = inferT st body i
-inferT st (Lambda (arg:rest) body) i =
+inferT table (Lambda [] body) i = inferT table body i
+inferT table (Lambda (arg:rest) body) i =
     let aType = getName i
-    in case inferT (TypeTable.insert arg aType st) (Lambda rest body) (succ i) of
+    in case inferT (TypeTable.insert arg aType table) (Lambda rest body) (succ i) of
         Ok (t, subst, iNew) -> Ok (TypeFunction (appSubstToType subst aType) t, subst, iNew)
         Err msg -> Err msg
 

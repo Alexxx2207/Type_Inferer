@@ -5,6 +5,8 @@ import           Inference
 import           LambdaTerm
 import           Utils
 
+-- Това са тестове, написани по време на разработката
+-- ТУК СЕ ПИШАТ ИЗРАЗИ, С КОИТО ДА СЕ ТЕСТВА ПРОГРАМАТА
 testCases :: [(Int, LambdaTerm)]
 testCases = [
         (1, Variable "x"),
