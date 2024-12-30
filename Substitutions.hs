@@ -1,58 +1,62 @@
 module Substitutions where
 
-import           Data.Map   as TypeTable
-import           Data.Maybe (fromMaybe)
-import           TermType   (TermType (..))
+import           Data.Map as Table
+import           TermType
 import           Utils
 
 
-type Table = TypeTable.Map String TermType
-type SubstitutionsTable = TypeTable.Map String TermType
+type Table = Table.Map String TermType
 
 -- <полагания, стар тип> -> нов тип
--- прилага полаганията, но само за един конкретен тип
--- полезно е, когато свършва оценяването на връх от дървото
-appSubstToType :: SubstitutionsTable -> TermType -> TermType
-appSubstToType substitutions old@(TypeVariable x)      = fromMaybe old (TypeTable.lookup x substitutions)
+appSubstToType :: Table -> TermType -> TermType
+appSubstToType substitutions old@(TypeVariable x) =
+    case Table.lookup x substitutions of
+        Just val -> val
+        Nothing  -> old
+
 appSubstToType substitutions (TypeFunction arg1 res1)  = TypeFunction (appSubstToType substitutions arg1) (appSubstToType substitutions res1)
 
--- <полагания, стар таблица> -> нов таблица
--- прилага полаганията върху цялата таблица
--- полезно е, когато при апликация искаме да променит тип - резултат от предишно оценяване преди да оценим нов израз
-appSubstToTable :: SubstitutionsTable -> Table -> Table
-appSubstToTable substitutions = TypeTable.map (appSubstToType substitutions)
-
--- <полагания, стар таблица> -> нов таблица
--- прилага полаганията върху полагания
--- целта е да избегнем частни случаи, при които се разчита на подредбата на полаганията в таблицата при обхождане
--- пример: полагане на полагането не може да бъде извършено преди първото полагане. Искаме гаранция, че ще се случат в правилен ред
-chainSubst :: SubstitutionsTable -> SubstitutionsTable -> SubstitutionsTable
-chainSubst oldSubs newSubs = TypeTable.union (TypeTable.map (appSubstToType oldSubs) newSubs) oldSubs
+-- <стари полагания, нови полагания> -> полагания
+-- прилага старите полагания върху новите полагания
+-- това е необходима функция, за да може да се приложат полагания върху промеливите от closure или след напасване на типове от тип 'функция'
+-- Идеята за тази функционалност е взета от:
+-- https://bernsteinbear.com/blog/type-inference/#:~:text=In%20order%20to%20keep%20the%20constraints%20(substitutions)%20flowing%20after%20each%20recursive%20call%20to%20infer_w%2C%20we%20need%20to%20be%20able%20to%20compose%20substitutions.
+chainSubst :: Table -> Table -> Table
+chainSubst old new = Prelude.foldr
+    (\k recRes ->
+        case Table.lookup k old of
+            Just  value -> Table.insert k value recRes
+            Nothing     -> recRes
+    )
+    (Table.map (appSubstToType old) new)
+    (Table.keys old)
 
 
 -- генерира полагания така че да си паснат типовете
-genSubst :: TermType -> TermType -> Result SubstitutionsTable
-genSubst old@(TypeVariable tName) target
-    | target == old = Ok TypeTable.empty
-    | contains tName target = Err $ cyclicDefinition tName target
-    | otherwise = Ok  (TypeTable.singleton tName target)
-
-genSubst target old@(TypeVariable tName)
-    | target == old = Ok TypeTable.empty
-    | contains tName target = Err $ cyclicDefinition tName target
-    | otherwise = Ok (TypeTable.singleton tName target)
-
-genSubst (TypeFunction arg1 res1) (TypeFunction arg2 res2) =
-    case genSubst arg1 arg2 of
+getSubs :: TermType -> TermType -> Result Table
+getSubs (TypeFunction arg1 res1)  (TypeFunction arg2 res2) =
+    case getSubs arg1 arg2 of
         Ok argSubst ->
-            case genSubst (appSubstToType argSubst res1) (appSubstToType argSubst res2) of
+            case getSubs (appSubstToType argSubst res1) (appSubstToType argSubst res2) of
                 Ok retSubst -> Ok $ chainSubst retSubst argSubst
                 Err msg     -> Err msg
         Err msg -> Err msg
 
+-- бази:
 
--- проверява дали не се среща даден тип в типа на израз
--- Идеята ми е че може да се случи така, че да дефинираме един тип, чрез друг тип, който друг тип се дефинира с единия тип
+getSubs old@(TypeVariable tName)  target
+    | target == old = Ok Table.empty
+    | contains tName target = Err $ "Cyclic definition of " ++ tName ++ " in " ++ show target
+    | otherwise = Ok  (Table.insert tName target Table.empty)
+
+-- за случая (а->б)->с и a->c - примерно:
+getSubs target old@(TypeVariable tName)
+    | target == old = Ok Table.empty
+    | contains tName target = Err $ "Cyclic definition of " ++ tName ++ " in " ++ show target
+    | otherwise = Ok (Table.insert tName target Table.empty)
+
+
+-- проверява дали не се среща тип в типа на израз
 contains :: String -> TermType -> Bool
-contains tName (TypeVariable x)         = x == tName
+contains tName (TypeVariable x) = x == tName
 contains tName (TypeFunction arg1 res1) = contains tName arg1 || contains tName res1

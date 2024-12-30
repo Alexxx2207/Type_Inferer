@@ -1,9 +1,9 @@
 module Main where
 
-import           Distribution.Simple.Test.ExeV10 (runTest)
 import           Inference
 import           LambdaTerm
 import           Utils
+
 
 -- Това са тестове, написани по време на разработката
 -- ТУК СЕ ПИШАТ ИЗРАЗИ, С КОИТО ДА СЕ ТЕСТВА ПРОГРАМАТА
@@ -25,6 +25,7 @@ testCases = [
         (14, Apply (Lambda ["x"] (Variable "x")) (Lambda ["y"] (Variable "y")))
     ]
 
+-- минава през изразите като unit tests библиотека(не измислих по-удобно нещо)
 runTests :: [(Int, LambdaTerm)] -> Int -> Int -> IO ()
 runTests [] _ _ = print "End"
 runTests ((num, expression):rest) mx spaces = do
