@@ -27,7 +27,8 @@ inferT table (Apply m n) i =
                         Ok substitutionsApply ->
                             -- отново необходимостта за композиция на полагания я взех от:
                             -- https://bernsteinbear.com/blog/type-inference/#:~:text=return%20compose(s3%2C%20compose(s2%2C%20s1))%2C%20apply_ty(r%2C%20s3)
-                            Ok (appSubstToType substitutionsApply resTName, chainSubst substitutionsApply $ chainSubst subsN subsM, succ iN)
+                            let finalSubs = chainSubst substitutionsApply $ chainSubst subsN subsM
+                            in Ok (appSubstToType finalSubs resTName, finalSubs, succ iN)
                         Err msg -> Err msg
                 Err msg -> Err msg
         Err msg -> Err msg
@@ -36,7 +37,7 @@ inferT table (Lambda [] body) i = inferT table body i
 inferT table (Lambda (arg:rest) body) i =
     let aType = getName i
     in case inferT (Table.insert arg aType table) (Lambda rest body) (succ i) of
-        Ok (t, subst, iNew) -> Ok (TypeFunction (appSubstToType subst aType) t, subst, iNew)
+        Ok (t, subst, iNew) -> Ok (appSubstToType subst (TypeFunction (appSubstToType subst aType) t), subst, iNew)
         Err msg -> Err msg
 
 -- фасадна функция за оценяване на тип на израз(за да не пишем в тестовете boilerplate code)
@@ -44,5 +45,5 @@ inferTFacade :: LambdaTerm -> Result TermType
 inferTFacade term =
     let result = inferT Table.empty term 0
     in case result of
-        Ok (t, subst, _) -> Ok (appSubstToType subst t)
+        Ok (t, _, _) -> Ok t
         Err err          -> Err err
