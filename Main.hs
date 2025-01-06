@@ -22,14 +22,14 @@ testCases = [
         (11, Lambda ["x", "y"] (Lambda ["x"] (Variable "x"))),
         (12, Lambda ["x", "y", "z"] ( Apply (Lambda ["b"] (Apply (Variable "x") (Variable "y"))) (Lambda [] (Apply (Variable "x") (Variable "z"))) )),
         (13, Lambda ["f","x","y"] (Apply (Apply (Variable "f") (Variable "x")) (Variable "y"))),
-        (14, Apply (Lambda ["x"] (Variable "x")) (Lambda ["y"] (Variable "y")))
+        (14, Apply (Apply (Lambda ["x"] (Variable "x")) (Lambda ["y"] (Variable "y"))) (Lambda ["z"] (Variable "z")))
     ]
 
 -- минава през изразите като unit tests библиотека(не измислих по-удобно нещо)
 runTests :: [(Int, LambdaTerm)] -> Int -> Int -> IO ()
 runTests [] _ _ = print "End"
 runTests ((num, expression):rest) mx spaces = do
-    print $ show num ++ ")" ++ replicate spaces ' ' ++ show (inferTFacade expression)
+    print $ show num ++ ")" ++ replicate spaces ' ' ++ show (inferTermTypeFacade expression)
     runTests rest mx (mx - countDigits (succ num))
 
 main :: IO ()

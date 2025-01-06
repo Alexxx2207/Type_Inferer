@@ -5,11 +5,11 @@ module TermType where
 data TermType = TypeVariable String | TypeFunction TermType TermType
 
 instance Show TermType where
-    show (TypeVariable s)   = s
-    show (TypeFunction a b) =
+    show (TypeVariable name)  = name
+    show (TypeFunction a r) =
         case a of
-            TypeFunction _ _ -> "(" ++ show a ++ ") -> " ++ show b
-            _                -> show a ++ " -> " ++ show b
+            TypeFunction _ _ -> "(" ++ show a ++ ") -> " ++ show r
+            _                -> show a ++ " -> " ++ show r
 
 instance Eq TermType where
     (==) (TypeVariable x) (TypeVariable y)         = x == y

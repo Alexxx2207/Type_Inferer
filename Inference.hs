@@ -1,49 +1,52 @@
 module Inference where
 
-import           Data.Map      as Table
 import           LambdaTerm
 import           Substitutions
+import           TableLogic
 import           TermType
 import           Utils
 
--- генерира нов тип
-getName :: Integer -> TermType
-getName i = TypeVariable ("a" ++ show i)
+-- за яснота
+-- <тип на израза, таблица с полагания, брой създадени вече променливи>
+type TypeInferenceEvaluation = (TermType, Table, Integer)
 
-inferT :: Table -> LambdaTerm -> Integer -> Result (TermType, Table, Integer)
+-- Оценява типа на израз на база израза, типовете на "видимите" променливи и на броя вече създадени променливи
+-- <израз за оценяване, таблица с променливи и техните типове, брой създадени вече променливи> -> оценка на израза
+inferTermType :: LambdaTerm -> Table -> Integer -> Result TypeInferenceEvaluation
 
-inferT table (Variable x) i =
-    case Table.lookup x table of
-        Just t  -> Ok (t, Table.empty, i)
-        Nothing -> Err ("Variable " ++ x ++ " not found")
+-- база
+-- просто изразът променлива: "х"
+inferTermType (Variable x) table i = case searchTable x table of
+        Ok t  -> Ok (t, [], i)
+        Err _ -> Err ("Variable " ++ x ++ " not found")
 
-inferT table (Apply m n) i =
-    case inferT table m  i of
-        Ok (tM, subsM, iM) ->
-            case inferT (Table.map (appSubstToType subsM) table) n iM of
-                Ok (tN, subsN, iN) ->
-                    let resTName = getName iN
-                    in case getSubs (appSubstToType subsN tM) (TypeFunction tN resTName) of
-                        Ok substitutionsApply ->
-                            -- отново необходимостта за композиция на полагания я взех от:
-                            -- https://bernsteinbear.com/blog/type-inference/#:~:text=return%20compose(s3%2C%20compose(s2%2C%20s1))%2C%20apply_ty(r%2C%20s3)
-                            let finalSubs = chainSubst substitutionsApply $ chainSubst subsN subsM
-                            in Ok (appSubstToType finalSubs resTName, finalSubs, succ iN)
-                        Err msg -> Err msg
+-- (MN)
+inferTermType (Apply m n) table i = case inferTermType m table i of
+    Ok (tM, subsM, iM) -> case inferTermType n (changeValues (applySubstitutionsToAType subsM) table) iM of
+        Ok (tN, subsN, iN) ->
+            let resTName = TypeVariable ("x" ++ show iN)
+            in case getSubs (applySubstitutionsToAType subsN tM) (TypeFunction tN resTName) of
+                Ok substitutionsApply ->
+                    -- отново, начина за композиция на полаганията я взех от:
+                    -- https://bernsteinbear.com/blog/type-inference/#:~:text=return%20compose(s3%2C%20compose(s2%2C%20s1))%2C%20apply_ty(r%2C%20s3)
+                    let finalSubs = chainSubst substitutionsApply $ chainSubst subsN subsM
+                    in Ok (applySubstitutionsToAType finalSubs resTName, finalSubs, succ iN)
                 Err msg -> Err msg
         Err msg -> Err msg
+    Err msg -> Err msg
 
-inferT table (Lambda [] body) i = inferT table body i
-inferT table (Lambda (arg:rest) body) i =
-    let aType = getName i
-    in case inferT (Table.insert arg aType table) (Lambda rest body) (succ i) of
-        Ok (t, subst, iNew) -> Ok (appSubstToType subst (TypeFunction (appSubstToType subst aType) t), subst, iNew)
+-- база на "разгръщането" на аргументите на ламбда функция
+inferTermType (Lambda [] body) table i = inferTermType body table i
+
+-- λ{<arg>}.<body>
+inferTermType (Lambda (arg:rest) body) table i =
+    let argType = TypeVariable ("x" ++ show i)
+    in case inferTermType (Lambda rest body) (insertPair arg argType table) (succ i) of
+        Ok (t, subst, iNew) -> Ok (TypeFunction (applySubstitutionsToAType subst argType) t, subst, iNew)
         Err msg -> Err msg
 
--- фасадна функция за оценяване на тип на израз(за да не пишем в тестовете boilerplate code)
-inferTFacade :: LambdaTerm -> Result TermType
-inferTFacade term =
-    let result = inferT Table.empty term 0
-    in case result of
-        Ok (t, _, _) -> Ok t
-        Err err          -> Err err
+-- фасадна функция за оценяване на тип на израз(за да не повтаряме в тестовете код)
+inferTermTypeFacade :: LambdaTerm -> Result TermType
+inferTermTypeFacade term = case inferTermType term [] 1 of
+        Ok (t, _, _) -> Ok (changeAllNamesFacade t)
+        Err err      -> Err err
