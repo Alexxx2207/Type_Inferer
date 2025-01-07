@@ -12,6 +12,6 @@ instance Show TermType where
             _                -> show a ++ " -> " ++ show r
 
 instance Eq TermType where
-    (==) (TypeVariable x) (TypeVariable y)         = x == y
-    (==) (TypeFunction x1 y1) (TypeFunction x2 y2) = x1 == x2 && y1 == y2
-    (==) _ _                                       = False
+    TypeVariable x == TypeVariable y         = x == y
+    TypeFunction x1 y1 == TypeFunction x2 y2 = x1 == x2 && y1 == y2
+    _ == _                                   = False
