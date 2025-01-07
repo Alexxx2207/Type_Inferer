@@ -3,9 +3,6 @@ module TableLogic where
 import           TermType
 import           Utils
 
-
-type Table = [(String, TermType)]
-
 -- търси в таблицата стойност по подаден ключ
 searchTable :: String -> Table -> Result TermType
 searchTable key table =
