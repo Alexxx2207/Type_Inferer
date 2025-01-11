@@ -31,7 +31,7 @@ unwrapCustomErr (Ok t) transformer errorMessage  = transformer t
 unwrapCustomErr (Err _) transformer errorMessage = Err errorMessage
 
 instance Show (Result TermType) where
-    show (Ok t)    = "Type: " ++ show t
+    show (Ok t)    = show t
     show (Err msg) = "Error: " ++ msg
 
 

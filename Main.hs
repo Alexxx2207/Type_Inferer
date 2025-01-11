@@ -29,7 +29,7 @@ testCases = [
 runTests :: [(Int, LambdaTerm)] -> Int -> Int -> IO ()
 runTests [] _ _ = print "End"
 runTests ((num, expression):rest) mx spaces = do
-    print $ show num ++ ")" ++ replicate spaces ' ' ++ show (inferTermTypeFacade expression)
+    print $ show num ++ ")" ++ replicate spaces ' ' ++ show expression ++ " : " ++ show (inferTermTypeFacade expression)
     runTests rest mx (mx - countDigits (succ num))
 
 main :: IO ()

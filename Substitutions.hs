@@ -27,18 +27,18 @@ chainSubst old new = foldr (\(k,v) recRes -> insertPair k v recRes) (changeValue
 
 
 -- генерира полагания така че да си паснат типовете
-getSubs :: TermType -> TermType -> Result Table
-getSubs (TypeFunction argLeft resLeft)  (TypeFunction argRight resRigbt) =
-    unwrap (getSubs resLeft resRigbt)
+getSubstitutions :: TermType -> TermType -> Result Table
+getSubstitutions (TypeFunction argLeft resLeft)  (TypeFunction argRight resRigbt) =
+    unwrap (getSubstitutions resLeft resRigbt)
         (\substFromResults ->
-            unwrap (getSubs (applySubstitutionsToAType substFromResults argLeft) (applySubstitutionsToAType substFromResults argRight))
+            unwrap (getSubstitutions (applySubstitutionsToAType substFromResults argLeft) (applySubstitutionsToAType substFromResults argRight))
                 -- отново, навързването на полагания по този начин не е моя идея
                 -- https://bernsteinbear.com/blog/type-inference/#:~:text=compose(%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20unify_w(apply_ty(l%2C%20result)%2C%20apply_ty(r%2C%20result))%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20result%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20)
                 (Ok . chainSubst substFromResults)
         )
 
 -- базa:
-getSubs left right =
+getSubstitutions left right =
     if left == right
         then Ok []
         else case (left, right) of

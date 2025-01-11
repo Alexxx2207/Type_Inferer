@@ -22,7 +22,7 @@ inferTermType (Apply m n) table variablesCounter =
             unwrap (inferTermType n (changeValues (applySubstitutionsToAType substitutionsM) table) variablesCounterM)
                 (\(typeN, substitutionsN, variablesCounterN) ->
                     let resTName = TypeVariable ("x" ++ show variablesCounterN)
-                    in unwrap (getSubs (applySubstitutionsToAType substitutionsN typeM) (TypeFunction typeN resTName))
+                    in unwrap (getSubstitutions (applySubstitutionsToAType substitutionsN typeM) (TypeFunction typeN resTName))
                         (\substitutionsApply ->
                             -- отново, начина за навързване на полаганията я взех от:
                             -- https://bernsteinbear.com/blog/type-inference/#:~:text=return%20compose(s3%2C%20compose(s2%2C%20s1))%2C%20apply_ty(r%2C%20s3)
