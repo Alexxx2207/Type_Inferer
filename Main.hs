@@ -22,7 +22,9 @@ testCases = [
         Lambda ["x", "y"] (Lambda ["x"] (Variable "x")),
         Lambda ["x", "y", "z"] ( Apply (Lambda ["b"] (Apply (Variable "x") (Variable "y"))) (Lambda [] (Apply (Variable "x") (Variable "z"))) ),
         Lambda ["f","x","y"] (Apply (Apply (Variable "f") (Variable "x")) (Variable "y")),
-        Apply (Apply (Lambda ["x"] (Variable "x")) (Lambda ["y"] (Variable "y"))) (Lambda ["z"] (Variable "z"))
+        Apply (Apply (Lambda ["x"] (Variable "x")) (Lambda ["y"] (Variable "y"))) (Lambda ["z"] (Variable "z")),
+        --credits: Виктор Пъжев - Колега:
+        Lambda ["x"] (Apply (Lambda ["f"] (Apply (Variable "f") (Apply (Variable "f") (Variable "x")))) (Lambda ["y"] (Variable "x")))
     ]
 
 -- минава през изразите като unit tests библиотека(не измислих по-удобно нещо)

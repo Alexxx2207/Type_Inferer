@@ -23,25 +23,25 @@ applySubstitutionsToAType substitutions (TypeFunction arg resType)  =
 -- Идеята за тази функционалност е взета(не се сетих за това) от:
 -- https://bernsteinbear.com/blog/type-inference/#:~:text=In%20order%20to%20keep%20the%20constraints%20(substitutions)%20flowing%20after%20each%20recursive%20call%20to%20infer_w%2C%20we%20need%20to%20be%20able%20to%20compose%20substitutions.
 chainSubst :: Table -> Table -> Table
-chainSubst old new = foldr (\(k,v) recRes -> insertPair k v recRes) (changeValues (applySubstitutionsToAType old) new) old
+chainSubst succSubstitutions initialSubstitutions = foldr (\(k,v) recRes -> insertPair k v recRes) (changeValues (applySubstitutionsToAType succSubstitutions) initialSubstitutions) succSubstitutions
 
 
 -- генерира полагания така че да си паснат типовете
 getSubstitutions :: TermType -> TermType -> Result Table
 getSubstitutions (TypeFunction argLeft resLeft)  (TypeFunction argRight resRigbt) =
-    unwrap (getSubstitutions resLeft resRigbt)
-        (\substFromResults ->
-            unwrap (getSubstitutions (applySubstitutionsToAType substFromResults argLeft) (applySubstitutionsToAType substFromResults argRight))
-                -- отново, навързването на полагания по този начин не е моя идея
-                -- https://bernsteinbear.com/blog/type-inference/#:~:text=compose(%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20unify_w(apply_ty(l%2C%20result)%2C%20apply_ty(r%2C%20result))%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20result%2C%0A%20%20%20%20%20%20%20%20%20%20%20%20)
-                (Ok . chainSubst substFromResults)
+    unwrap (getSubstitutions argLeft argRight)
+        (\substFromArgs ->
+            unwrap (getSubstitutions (applySubstitutionsToAType substFromArgs resLeft) (applySubstitutionsToAType substFromArgs resRigbt))
+                (\substFromResult -> Ok $ chainSubst substFromResult substFromArgs)
         )
 
 -- базa:
-getSubstitutions left right =
-    if left == right
-        then Ok []
-        else case (left, right) of
+getSubstitutions left right
+    | left == right = Ok []
+    | otherwise = case (left, right) of
+        -- наблюдение: когато и left, и right са TypeVariable, то левият тип е с по-голям приоритет, защото
+        --  при извикване на getSubstitutions при апликация за напасване на (TypeFunction arg res) с типа на левия израз
+        --  трябва да се вземе предвид типа на arg, а не типа от левия израз
             (TypeVariable tName, _) ->
                 if contains tName right
                     then Err $ "Cyclic definition of " ++ tName ++ " in " ++ show right

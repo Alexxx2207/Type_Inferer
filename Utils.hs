@@ -67,7 +67,7 @@ enumerate (curr:rest) counter = (counter, curr) : enumerate rest (succ counter)
 
 -- "обхожда дървото на типа в дълбочина и променя имената на типовете с индексите им в масива"
 changeAllNames :: TermType -> Array -> TermType
-changeAllNames (TypeVariable (_:number)) dict = TypeVariable ("x" ++ show (fst $ head (filter (\(_,old) -> old == read number) dict)))
+changeAllNames (TypeVariable (_:number)) dict = TypeVariable ("t" ++ show (fst $ head (filter (\(_,old) -> old == read number) dict)))
 changeAllNames (TypeFunction arg body) dict = TypeFunction (changeAllNames arg dict) (changeAllNames body dict)
 
 
