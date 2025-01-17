@@ -39,9 +39,9 @@ getSubstitutions (TypeFunction argLeft resLeft)  (TypeFunction argRight resRigbt
 getSubstitutions left right
     | left == right = Ok []
     | otherwise = case (left, right) of
-        -- наблюдение: когато и left, и right са TypeVariable, то левият тип е с по-голям приоритет, защото
-        --  при извикване на getSubstitutions при апликация за напасване на (TypeFunction arg res) с типа на левия израз
-        --  трябва да се вземе предвид типа на arg, а не типа от левия израз
+        -- наблюдение: когато и left, и right са TypeVariable, то десният тип е „с по-голям приоритет“, тоест при извикване на
+        -- getSubstitutions при апликация за напасване на (TypeFunction arg res) стипа на левия израз трябва да се вземе предвид
+        -- типа на arg/res, а не типа от левия израз.
             (TypeVariable tName, _) ->
                 if contains tName right
                     then Err $ "Cyclic definition of " ++ tName ++ " in " ++ show right
