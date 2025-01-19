@@ -23,7 +23,7 @@ inferTermType (Apply m n) table variablesCounter =
                 (\(typeN, substitutionsN, variablesCounterN) ->
                     let resTName = TypeVariable ("t" ++ show variablesCounterN)
                         chainedSubstitutionsFromChildrenNodes = chainSubst substitutionsN substitutionsM
-                    in unwrap (getSubstitutions (applySubstitutionsToAType chainedSubstitutionsFromChildrenNodes typeM) (TypeFunction (applySubstitutionsToAType chainedSubstitutionsFromChildrenNodes typeN) resTName))
+                    in unwrap (getSubstitutions (applySubstitutionsToAType chainedSubstitutionsFromChildrenNodes typeM) (TypeFunction typeN resTName))
                         (\substitutionsApply ->
                             -- отново, начина за навързване на полаганията я взех от:
                             -- https://bernsteinbear.com/blog/type-inference/#:~:text=return%20compose(s3%2C%20compose(s2%2C%20s1))%2C%20apply_ty(r%2C%20s3)

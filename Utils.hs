@@ -9,6 +9,9 @@ type Transformer typeOfArgument typeOfResult = (typeOfArgument -> typeOfResult)
 
 data Result t = Ok t | Err String
 
+-- съобщение за грешка
+cyclicDefinitionErr typeName expr = "Cyclic definition of " ++ typeName ++ " in " ++ expr
+
 -- Обработва Result резултат
 -- Ако той е Ок, то обработва стойността(полето на Ok) по начин, диктуван от подадения "трансформатор"
 -- Ако той е Err, то връща грешката
